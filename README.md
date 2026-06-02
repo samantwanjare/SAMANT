@@ -28,3 +28,19 @@ Install Nginx reverse proxy to make this application available
 
 `sudo apt-get update`
 `sudo apt install nginx`
+
+## Production Troubleshooting Case Study
+
+During deployment, the application failed due to multiple infrastructure and database issues.
+
+Topics covered:
+
+- Docker troubleshooting
+- MySQL authentication issues
+- Container networking
+- Persistent volume behavior
+- Swap configuration
+- Gunicorn startup debugging
+- Root cause analysis
+
+👉 Full report: [docs/troubleshooting-case-study.md](docs/troubleshooting-case-study.md)
