@@ -1,4 +1,3 @@
-version: "3.8"
 
 services:
   nginx:
@@ -16,7 +15,7 @@ services:
   django_app:
     build:
       context: .
-    image: django_app
+    image: "pratik140404/notes-app:latest"
     container_name: "django_cont"
     ports:
       - "8000:8000"
