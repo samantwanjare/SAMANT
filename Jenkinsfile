@@ -40,6 +40,7 @@ pipeline{
                 script{
                     docker_compose()
                 }
+                echo"Deployment Completed."
             }
             
         }
