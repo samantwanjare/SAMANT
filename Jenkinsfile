@@ -11,7 +11,7 @@ pipeline{
         }
         stage("Code Build"){
             steps{
-            dockerbuild("notes-app","latest")
+            dockerbuild("django_app","latest")
             }
         }
         stage("Push to DockerHub"){
