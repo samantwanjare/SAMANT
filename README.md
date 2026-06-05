@@ -1,12 +1,12 @@
-# Simple Notes App for TWS Community
-This is a simple notes app built with React and Django.
+# Simple Notes App for TWS Community testing ok
+This is a simple notes app built with React and Django. testing
 
 ## Requirements
-1. Python 3.9
+1. Python 3.10
 2. Node.js
 3. React
 
-## Installation
+## Installation 
 1. Clone the repository
 ```
 git clone https://github.com/LondheShubham153/django-notes-app.git
