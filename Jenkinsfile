@@ -74,7 +74,7 @@ post {
     }
 
     failure {
-        echo "Pipeline failed you need to recorrect"
+        echo "Pipeline failed"
     }
   }
 }
