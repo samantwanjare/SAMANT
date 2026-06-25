@@ -70,7 +70,7 @@ stages {
 post {
 
     success {
-        echo "Pipeline executed successfully"
+        echo "Pipeline is executed successfully"
     }
 
     failure {
