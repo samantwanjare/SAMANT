@@ -1,29 +1,80 @@
+@Library("shared") _
 pipeline {
-    agent any
-    stages{
-        stage("Clone Code"){
-            steps{
-                git url: "https://github.com/LondheShubham153/django-notes-app.git", branch: "main"
-            }
-        }
-        stage("Build and Test"){
-            steps{
-                sh "docker build . -t note-app-test-new"
-            }
-        }
-        stage("Push to Docker Hub"){
-            steps{
-                withCredentials([usernamePassword(credentialsId:"dockerHub",passwordVariable:"dockerHubPass",usernameVariable:"dockerHubUser")]){
-                sh "docker tag note-app-test-new ${env.dockerHubUser}/note-app-test-new:latest"
-                sh "docker login -u ${env.dockerHubUser} -p ${env.dockerHubPass}"
-                sh "docker push ${env.dockerHubUser}/note-app-test-new:latest"
-                }
-            }
-        }
-        stage("Deploy"){
-            steps{
-                sh "docker-compose down && docker-compose up -d"
+agent {
+    label "samant"
+}
+
+environment {
+    ECR_REGISTRY = "769265543964.dkr.ecr.ap-south-1.amazonaws.com"
+    ECR_REPOSITORY = "samant/notes-app"
+    IMAGE_TAG = "latest"
+    AWS_REGION = "ap-south-1"
+}
+
+stages {
+    stage("Hello"){
+        steps{
+            script{
+                hello()
             }
         }
     }
+    stage("Code") {
+        steps {
+            script{
+                clone("https://github.com/samantwanjare/SAMANT.git","main")
+            }
+   
+        }
+    }
+
+    stage("Build") {
+        steps {
+            echo "Building Docker image"
+
+            sh '''
+            whoami
+            docker build -t notes-app:${IMAGE_TAG} .
+            '''
+        }
+    }
+
+    stage("Push to ECR") {
+        steps {
+            echo "Pushing Docker image to AWS ECR"
+
+            sh '''
+            aws ecr get-login-password --region ${AWS_REGION} | \
+            docker login --username AWS --password-stdin ${ECR_REGISTRY}
+
+            docker tag notes-app:${IMAGE_TAG} \
+            ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
+
+            docker push \
+            ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
+            '''
+        }
+    }
+
+    stage("Deploy") {
+        steps {
+            echo "Deploying application"
+
+            sh '''
+            docker compose up -d
+            '''
+        }
+    }
+}
+
+post {
+
+    success {
+        echo "Pipeline executed successfully"
+    }
+
+    failure {
+        echo "Pipeline failed"
+    }
+  }
 }
