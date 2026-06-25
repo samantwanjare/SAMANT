@@ -42,7 +42,7 @@ pipeline {
             }
         }
 
-        stage('Push Image') {
+        stage('Push Image to ECR') {
             steps {
                 sh '''
                 docker push 769265543964.dkr.ecr.ap-south-1.amazonaws.com/samant/notes-app:${BUILD_NUMBER}
