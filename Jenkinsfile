@@ -30,7 +30,7 @@ stages {
 
     stage("Build") {
         steps {
-            echo "Building Docker image"
+            echo "Building a Docker image"
 
             sh '''
             whoami
