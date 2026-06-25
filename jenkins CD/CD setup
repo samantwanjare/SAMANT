@@ -1,0 +1,364 @@
+jenkins CD/CD setup
+
+If you have only **2 EC2 instances**:
+
+* EC2-1 → Jenkins Master
+* EC2-2 → Jenkins Agent
+
+Then follow this setup from scratch.
+
+# Architecture
+
+```text
+GitHub
+   |
+   v
+Jenkins Master (EC2-1)
+   |
+SSH Connection
+   |
+   v
+Jenkins Agent (EC2-2)
+   |
+Docker Build
+   |
+Amazon ECR
+```
+
+---
+
+# Step 1: Create ECR Repository
+
+Login to AWS CLI from Jenkins Agent:
+
+```bash
+aws configure
+```
+
+Provide:
+
+```text
+AWS Access Key
+AWS Secret Key
+Region = ap-south-1
+```
+
+Create repository:
+
+```bash
+aws ecr create-repository \
+--repository-name myapp \
+--region ap-south-1
+```
+
+Verify:
+
+```bash
+aws ecr describe-repositories
+```
+
+---
+
+# Step 2: Install Jenkins on Master EC2
+
+Amazon Linux:
+
+```bash
+sudo yum update -y
+```
+
+Install Java:
+
+```bash
+sudo dnf install java-17-amazon-corretto -y
+```
+
+Add Jenkins repo:
+
+```bash
+sudo wget -O /etc/yum.repos.d/jenkins.repo \
+https://pkg.jenkins.io/redhat-stable/jenkins.repo
+```
+
+```bash
+sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+```
+
+Install Jenkins:
+
+```bash
+sudo yum install jenkins -y
+```
+
+Start Jenkins:
+
+```bash
+sudo systemctl enable jenkins
+sudo systemctl start jenkins
+```
+
+Open Security Group:
+
+```text
+8080
+```
+
+Get password:
+
+```bash
+sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+```
+
+Access:
+
+```text
+http://MASTER_PUBLIC_IP:8080
+```
+
+---
+
+# Step 3: Install Docker on Agent
+
+On EC2-2:
+
+```bash
+sudo yum install docker -y
+```
+
+```bash
+sudo systemctl enable docker
+sudo systemctl start docker
+```
+
+Verify:
+
+```bash
+docker --version
+```
+
+---
+
+# Step 4: Install AWS CLI on Agent
+
+```bash
+sudo yum install unzip -y
+```
+
+```bash
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+```
+
+```bash
+unzip awscliv2.zip
+sudo ./aws/install
+```
+
+Verify:
+
+```bash
+aws --version
+```
+
+---
+
+# Step 5: Create Jenkins User on Agent
+
+```bash
+sudo useradd jenkins
+```
+
+Set password:
+
+```bash
+sudo passwd jenkins
+```
+
+Add docker permission:
+
+```bash
+sudo usermod -aG docker jenkins
+```
+
+---
+
+# Step 6: Configure SSH Between Master and Agent
+
+On Jenkins Master:
+
+```bash
+sudo su - jenkins
+```
+
+Generate key:
+
+```bash
+ssh-keygen
+```
+
+Press Enter.
+
+Copy key:
+
+```bash
+ssh-copy-id jenkins@AGENT_PRIVATE_IP
+```
+
+Test:
+
+```bash
+ssh jenkins@AGENT_PRIVATE_IP
+```
+
+Should login without password.
+
+---
+
+# Step 7: Configure Agent in Jenkins
+
+Install plugin:
+
+```text
+Manage Jenkins
+→ Plugins
+→ SSH Build Agents
+```
+
+Create Node:
+
+```text
+Manage Jenkins
+→ Nodes
+→ New Node
+```
+
+Example:
+
+```text
+Name: agent1
+Label: docker-agent
+Remote Root Directory:
+/home/jenkins
+```
+
+Launch Method:
+
+```text
+Launch agents via SSH
+```
+
+Provide:
+
+```text
+Private IP of Agent
+SSH Credential
+```
+
+Save.
+
+Agent should become:
+
+```text
+Online
+```
+
+---
+
+# Step 8: Create Sample Application
+
+Example Dockerfile:
+
+```dockerfile
+FROM nginx
+COPY . /usr/share/nginx/html
+```
+
+Push code to GitHub.
+
+---
+
+# Step 9: Create Jenkins Pipeline
+
+```groovy
+pipeline {
+
+ agent {
+     label 'docker-agent'
+ }
+
+ environment {
+     REGION='ap-south-1'
+     ACCOUNT_ID='YOUR_ACCOUNT_ID'
+     REPO='myapp'
+ }
+
+ stages {
+
+    stage('Checkout'){
+      steps{
+        git 'https://github.com/user/repo.git'
+      }
+    }
+
+    stage('Build'){
+      steps{
+        sh 'docker build -t myapp .'
+      }
+    }
+
+    stage('Login ECR'){
+      steps{
+        sh '''
+        aws ecr get-login-password --region $REGION \
+        | docker login \
+        --username AWS \
+        --password-stdin \
+        $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
+        '''
+      }
+    }
+
+    stage('Tag'){
+      steps{
+        sh '''
+        docker tag myapp:latest \
+        $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO:${BUILD_NUMBER}
+        '''
+      }
+    }
+
+    stage('Push'){
+      steps{
+        sh '''
+        docker push \
+        $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO:${BUILD_NUMBER}
+        '''
+      }
+    }
+
+ }
+}
+```
+
+---
+
+# Step 10: IAM Permissions (Recommended)
+
+Instead of storing AWS keys:
+
+1. Create IAM Role.
+2. Attach ECR permissions.
+3. Attach role to Agent EC2.
+
+Required permissions:
+
+```text
+AmazonEC2ContainerRegistryFullAccess
+```
+
+Then no `aws configure` is needed.
+
+---
+
+## Interview Flow
+
+> Developer pushes code to GitHub. Jenkins Master receives the trigger and schedules the build on Jenkins Agent. The Agent checks out the code, builds the Docker image, authenticates to Amazon ECR using IAM Role, tags the image, and pushes it to ECR. Jenkins Master only manages the pipeline, while all build activities run on the Agent node.
